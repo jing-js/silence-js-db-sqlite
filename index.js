@@ -1,7 +1,5 @@
 'use strict';
 
-const silence = require('silence-js');
-const BaseSQLDatabaseStore = silence.BaseSQLDatabaseStore;
 const sqlite = require('sqlite3');
 const path = require('path');
 const CWD = process.cwd();
@@ -30,16 +28,17 @@ function createDir(dir) {
   })
 }
 
-class SqliteDatabaseStore extends BaseSQLDatabaseStore {
-  constructor(config, logger) {
-    super(logger, 'sqlite');
-    this.db = null;
-    this.file = config.file ? path.resolve(CWD, config.file) : ':memory:';
+class SqliteDatabaseStore {
+  constructor(config) {
+    this.logger = config.logger;
+    this._db = null;
+    this._file = config.file ? path.resolve(CWD, config.file) : ':memory:';
   }
+
   init() {
-    return createDir(path.dirname(this.file)).then(() => {
+    return createDir(path.dirname(this._file)).then(() => {
       return new Promise((resolve, reject) => {
-        this.db = new sqlite.Database(this.file, (err) => {
+        this._db = new sqlite.Database(this._file, (err) => {
           if (err) {
             reject(err);
           } else {
@@ -51,7 +50,7 @@ class SqliteDatabaseStore extends BaseSQLDatabaseStore {
   }
   close() {
     return new Promise((resolve, reject) => {
-      this.db.close(err => {
+      this._db.close(err => {
         if(err) {
           reject(err);
         } else {
@@ -61,9 +60,35 @@ class SqliteDatabaseStore extends BaseSQLDatabaseStore {
     });
   }
   initField(field) {
-    super.initField(field);
-    if (/^INT/.test(field.type)) {
-      field.type = 'INTEGER';
+    if (!field.rules) {
+      field.rules = {};
+    }
+    if (!field.dbType) {
+      field.dbType = field.type;
+    }
+    if (!field.dbType) {
+      field.dbType = 'VARCHAR';
+    } else {
+      field.dbType = field.dbType.trim().toUpperCase();
+    }
+    if (/^INT/.test(field.dbType)) {
+      field.dbType = 'INTEGER';
+    }
+    if (/^(?:FLOAT)|(?:DOUBLE)|(?:SHORT)/.test(field.dbType)) {
+      field.dbType = 'NUMBER';
+    }
+    if (/^VARCHAR$/.test(field.dbType)|| /^CHAR$/.test(field.dbType)) {
+      field.dbType = field.dbType + '(45)';
+    }
+    let m = field.dbType.match(/^(?:VAR)?CHAR\(\s*(\d+)\s*\)/);
+    if (m && !field.rules.maxLength && !field.rules.rangeLength) {
+      field.rules.maxLength = Number(m[1]);
+    }
+
+    if (/^(?:VARCHAR)|(?:CHAR)|(?:TEXT)/.test(field.dbType)) {
+      field.type = 'string';
+    } else if (/^(?:INT)|(?:NUM)|(?:FLOAT)|(?:DOUBLE)|(?:SHORT)/.test(field.dbType)) {
+      field.type = 'number';
     }
   }
   genCreateTableSQL(Model) {
@@ -85,7 +110,7 @@ class SqliteDatabaseStore extends BaseSQLDatabaseStore {
     for(let i = 0; i < fields.length; i++) {
 
       let field = fields[i];
-      let sqlSeg = `\`${field.name}\` ${field.type.toUpperCase()}`;
+      let sqlSeg = `\`${field.name}\` ${field.dbType.toUpperCase()}`;
 
       if (field.require || field.primaryKey) {
         sqlSeg += ' NOT NULL';
@@ -133,7 +158,7 @@ class SqliteDatabaseStore extends BaseSQLDatabaseStore {
     this.logger.debug(queryString);
     this.logger.debug(queryParams);
     return new Promise((resolve, reject) => {
-      this.db.run(queryString, queryParams, function(err) {
+      this._db.run(queryString, queryParams, function(err) {
         if (err) {
           reject(err);
         } else {
@@ -149,7 +174,7 @@ class SqliteDatabaseStore extends BaseSQLDatabaseStore {
     this.logger.debug(queryString);
     this.logger.debug(queryParams);
     return new Promise((resolve, reject) => {
-      this.db.all(queryString, queryParams, function(err, rows) {
+      this._db.all(queryString, queryParams, function(err, rows) {
         if (err) {
           reject(err);
         } else {

@@ -1,6 +1,6 @@
 {
   "name": "silence-js-db-sqlite",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "sqlite3 db for silence-js",
   "main": "index.js",
   "scripts": {
@@ -17,7 +17,6 @@
   },
   "homepage": "https://github.com/jing-js/silence-js-db-sqlite#readme",
   "dependencies": {
-    "silence-js": "^1.0.0",
     "sqlite3": "^3.1.4"
   }
 }
