@@ -12,7 +12,6 @@ function createDir(dir) {
         // 如果不存在，先创建其父亲文件夹。这是一个递归的过程
         let parentDir = path.dirname(dir);
         createDir(parentDir).then(() => {
-          console.log(dir);
           fs.mkdir(dir, err => {
             if (err) {
               reject(err);
